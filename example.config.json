@@ -1,0 +1,12 @@
+{
+  "texts_dir": "texts",
+  "html_file": "index.html",
+  "base_text_file": "text.txt",
+  "person_file": "Mamma.txt",
+  "port": null,
+  "baud": 921600,
+  "fqbn": "esp32:esp32:esp32c3",
+  "allow_reflash": false,
+  "preview_port": 8000,
+  "live_reload": true
+}
