@@ -2,13 +2,14 @@
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <nvs_flash.h>
+#include "esp_netif.h"
 
-const char* ssid = "Graduation Greeting";
+const char* ssid = "Frequenza Silente";
 
 const byte DNS_PORT = 53;
 
 // THE FIX: Use a fake "Public" IP instead of 192.168.4.1
-// This tricks Android/Samsung/iOS into showing the popup immediately
+// This forces Android (Samsung/Xiaomi/Pixel) to trigger the captive portal popup immediately
 IPAddress apIP(4, 3, 2, 1); 
 DNSServer dnsServer;
 WebServer server(80);
@@ -19,6 +20,7 @@ void handleRoot() {
   server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   server.sendHeader("Pragma", "no-cache");
   server.sendHeader("Expires", "-1");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "text/html; charset=utf-8", HTML_PAGE);
 }
 
@@ -42,6 +44,15 @@ void setup() {
   WiFi.softAP(ssid, NULL, 1, 0, 4);
   delay(100); 
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+
+  // 1b. RFC 8910 DHCP Option 114 for direct captive portal URL discovery
+  static char captiveportal_uri[] = "http://4.3.2.1/";
+  esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+  if (ap_netif != NULL) {
+    esp_netif_dhcps_stop(ap_netif);
+    esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captiveportal_uri, strlen(captiveportal_uri));
+    esp_netif_dhcps_start(ap_netif);
+  }
   
   // 2. Start DNS with TTL = 0 so phones don't cache it
   dnsServer.setTTL(0);
