@@ -170,18 +170,19 @@
       });
 
       function lookupDedication(name) {
-        var key = name.toLowerCase().replace(/\.txt$/i, '');
-        var text = ALL_TEXTS[key];
+        var key = name.toLowerCase().replace(/\.txt$/i, '').trim();
+        var normalizedKey = key.normalize ? key.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : key;
+        var text = ALL_TEXTS[key] !== undefined ? ALL_TEXTS[key] : ALL_TEXTS[normalizedKey];
 
         if (text !== undefined) {
-          if (text === dedication.textContent) return;
-          currentLoaded = key;
-
           input.classList.remove('shake', 'success');
           input.classList.add('success');
           setTimeout(function() { input.classList.remove('success'); }, 800);
 
-          swapText(text, false);
+          if (text !== dedication.textContent) {
+            currentLoaded = key;
+            swapText(text, false);
+          }
         } else {
           // Shake on wrong guess
           input.classList.remove('shake');

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from config import load_config
+from config import load_config, load_all_texts_map
 
 try:
     import serial.tools.list_ports
@@ -176,6 +176,7 @@ def compile_sketch(
     texts_dir: str = "texts",
     base_text_file: str = "text.txt",
     person_file: Optional[str] = None,
+    mapping_file: str = "mapping.json",
 ) -> bool:
     """
     Loads html_path, substitutes [TEXT], [ADDITIONAL_TEXT], and [ALL_TEXTS] tokens,
@@ -223,19 +224,12 @@ def compile_sketch(
     escaped_main = html.escape(main_text.strip())
     escaped_ded = html.escape(dedication_text.strip()) if dedication_text else ""
 
-    # Build ALL_TEXTS JSON map from all .txt files in texts_dir (excluding base_text_file)
-    all_texts_map = {}
-    texts_path = Path(texts_dir)
-    if texts_path.is_dir():
-        base_name = Path(base_text_file).name.lower()
-        for txt_file in texts_path.glob("*.txt"):
-            if txt_file.name.lower() == base_name:
-                continue  # skip the base text file
-            try:
-                content = txt_file.read_text(encoding="utf-8").strip()
-                all_texts_map[txt_file.stem.lower()] = content
-            except Exception:
-                pass
+    # Build ALL_TEXTS JSON map using texts/ and mapping.json
+    all_texts_map = load_all_texts_map(
+        texts_dir=texts_dir,
+        base_text_file=base_text_file,
+        mapping_file=mapping_file,
+    )
     all_texts_json = json.dumps(all_texts_map, ensure_ascii=False)
 
     processed_html = html_content.replace("[TEXT]", escaped_main)
