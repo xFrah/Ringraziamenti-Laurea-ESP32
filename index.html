@@ -166,7 +166,7 @@
     <h1>Alleluia!</h1>
     <div class="main-text">[TEXT]</div>
     <div class="divider"></div>
-    <div class="dedication" id="dedication">[ADDITIONAL_TEXT]</div>
+    <div class="dedication" id="dedication"></div>
   </div>
 
   <div class="reveal-wrapper" id="revealWrapper">
@@ -184,7 +184,7 @@
       id="searchInput"
       autocomplete="off"
       spellcheck="false"
-      placeholder="[PERSON_NAME]"
+      placeholder="Il tuo nome..."
     >
   </div>
 
@@ -192,6 +192,7 @@
     // All dedication texts are embedded at build time as a JSON map
     // Keys are lowercase filenames (without .txt), values are the text content
     var ALL_TEXTS = [ALL_TEXTS];
+    var PLACEHOLDER_NAMES = [PLACEHOLDER_NAMES];
 
     (function() {
       var revealBtn = document.getElementById('revealBtn');
@@ -199,9 +200,50 @@
       var searchWrapper = document.getElementById('searchWrapper');
       var input = document.getElementById('searchInput');
       var dedication = document.getElementById('dedication');
-      var defaultText = dedication.textContent;
       var debounceTimer = null;
       var currentLoaded = null;
+
+      // Typewriter placeholder animation
+      var nameIndex = 0;
+      var charIndex = 0;
+      var isDeleting = false;
+      var typeTimer = null;
+
+      function typeLoop() {
+        if (!PLACEHOLDER_NAMES || PLACEHOLDER_NAMES.length === 0) return;
+
+        // If user has typed text into input, pause updating the placeholder
+        if (input.value.length > 0) {
+          typeTimer = setTimeout(typeLoop, 500);
+          return;
+        }
+
+        var currentName = PLACEHOLDER_NAMES[nameIndex];
+
+        if (isDeleting) {
+          charIndex--;
+          input.setAttribute('placeholder', currentName.substring(0, charIndex));
+          if (charIndex === 0) {
+            isDeleting = false;
+            nameIndex = (nameIndex + 1) % PLACEHOLDER_NAMES.length;
+            typeTimer = setTimeout(typeLoop, 400);
+            return;
+          }
+          typeTimer = setTimeout(typeLoop, 60);
+        } else {
+          charIndex++;
+          input.setAttribute('placeholder', currentName.substring(0, charIndex));
+          if (charIndex === currentName.length) {
+            isDeleting = true;
+            typeTimer = setTimeout(typeLoop, 1800);
+            return;
+          }
+          typeTimer = setTimeout(typeLoop, 120);
+        }
+      }
+
+      // Start typewriter loop
+      typeLoop();
 
       revealBtn.addEventListener('click', function() {
         revealWrapper.style.display = 'none';
@@ -214,10 +256,9 @@
         var query = input.value.trim();
 
         if (!query) {
-          if (currentLoaded !== null) {
-            swapText(defaultText, true);
-            currentLoaded = null;
-          }
+          // Do not return to default when empty; keep the last displayed dedication
+          clearTimeout(typeTimer);
+          typeTimer = setTimeout(typeLoop, 200);
           return;
         }
 
@@ -246,10 +287,10 @@
 
           if (text !== dedication.textContent) {
             currentLoaded = key;
-            swapText(text, false);
+            swapText(text);
           }
         } else {
-          // Shake on wrong guess
+          // Shake on wrong guess, but keep the current text displayed
           input.classList.remove('shake');
           input.offsetHeight;
           input.classList.add('shake');
@@ -257,7 +298,7 @@
         }
       }
 
-      function swapText(newText, isReset) {
+      function swapText(newText) {
         dedication.classList.add('fade-out');
         setTimeout(function() {
           dedication.textContent = newText;

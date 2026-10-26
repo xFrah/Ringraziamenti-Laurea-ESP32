@@ -1,7 +1,7 @@
 """
 ESP32 Continuous Flashing Pipeline
 Loads HTML from an external file (index.html), substitutes [TEXT] and
-[ADDITIONAL_TEXT] tokens using text.txt and secondary dedication files (e.g. Mamma.txt),
+[ALL_TEXTS] tokens using text.txt and texts/ dedication files,
 injects the processed HTML into main.ino, recompiles on startup, detects newly
 plugged ESP32 boards, verifies chip MAC in RAM to prevent duplicate flashing, and flashes.
 """
@@ -172,14 +172,13 @@ def compile_sketch(
     build_dir: str = BUILD_DIR,
     fqbn: str = DEFAULT_FQBN,
     main_text: str = "",
-    dedication_text: Optional[str] = None,
     texts_dir: str = "texts",
     base_text_file: str = "text.txt",
-    person_file: Optional[str] = None,
+    placeholder_names: Optional[List[str]] = None,
     mapping_file: str = "mapping.json",
 ) -> bool:
     """
-    Loads html_path, substitutes [TEXT], [ADDITIONAL_TEXT], and [ALL_TEXTS] tokens,
+    Loads html_path, substitutes [TEXT], [ALL_TEXTS], and [PLACEHOLDER_NAMES] tokens,
     injects the resulting HTML into sketch_path, stages into a temporary build folder,
     and recompiles with arduino-cli.
     The original sketch_path and html_path remain clean with tokens intact.
@@ -219,10 +218,9 @@ def compile_sketch(
                 except Exception:
                     pass
 
-    # Read HTML template and substitute [TEXT] and [ADDITIONAL_TEXT]
+    # Read HTML template and substitute tokens
     html_content = html_file.read_text(encoding="utf-8")
     escaped_main = html.escape(main_text.strip())
-    escaped_ded = html.escape(dedication_text.strip()) if dedication_text else ""
 
     # Build ALL_TEXTS JSON map using texts/ and mapping.json
     all_texts_map = load_all_texts_map(
@@ -232,13 +230,18 @@ def compile_sketch(
     )
     all_texts_json = json.dumps(all_texts_map, ensure_ascii=False)
 
-    processed_html = html_content.replace("[TEXT]", escaped_main)
-    processed_html = processed_html.replace("[ADDITIONAL_TEXT]", escaped_ded)
-    processed_html = processed_html.replace("[ALL_TEXTS]", all_texts_json)
+    if placeholder_names is None:
+        placeholder_names = [
+            "Mamma", "Papà", "Francesco", "Boys", "Mea",
+            "Nonna", "Teo", "Zio", "Sonia", "Martina", "Manuela"
+        ]
+    placeholder_names_json = json.dumps(placeholder_names, ensure_ascii=False)
 
-    # Inject the current person file name as the search bar placeholder
-    person_display = Path(person_file).stem if person_file else ""
-    processed_html = processed_html.replace("[PERSON_NAME]", html.escape(person_display))
+    processed_html = html_content.replace("[TEXT]", escaped_main)
+    processed_html = processed_html.replace("[ADDITIONAL_TEXT]", "")
+    processed_html = processed_html.replace("[ALL_TEXTS]", all_texts_json)
+    processed_html = processed_html.replace("[PLACEHOLDER_NAMES]", placeholder_names_json)
+    processed_html = processed_html.replace("[PERSON_NAME]", "Il tuo nome...")
 
     # Inject processed HTML into sketch
     sketch_content = sketch.read_text(encoding="utf-8")
@@ -354,7 +357,6 @@ def print_banner(
     html_file: str,
     texts_dir: str,
     base_text_file: str,
-    dedication_name: Optional[str] = None,
 ):
     print()
     print(f"{Colors.CYAN}{'═' * 66}{Colors.RESET}")
@@ -365,7 +367,7 @@ def print_banner(
     print(f"  {Colors.BOLD}HTML File:{Colors.RESET}    {html_file}")
     print(f"  {Colors.BOLD}Texts Folder:{Colors.RESET} {texts_dir}/")
     print(f"  {Colors.BOLD}Base Text:{Colors.RESET}    {base_text_file} -> [TEXT]")
-    print(f"  {Colors.BOLD}Dedication:{Colors.RESET}   {Colors.MAGENTA}{dedication_name or 'None'}{Colors.RESET} -> [ADDITIONAL_TEXT]")
+    print(f"  {Colors.BOLD}All Texts:{Colors.RESET}    {texts_dir}/ -> [ALL_TEXTS]")
     print(f"  {Colors.BOLD}FQBN:{Colors.RESET}         {fqbn}")
     print(f"  {Colors.BOLD}Baud Rate:{Colors.RESET}    {baud}")
     print(f"{Colors.CYAN}{'─' * 66}{Colors.RESET}")
@@ -378,7 +380,7 @@ def continuous_flashing_loop(
     texts_dir: str = "texts",
     html_file: str = "index.html",
     base_text_file: str = "text.txt",
-    person_file: Optional[str] = None,
+    placeholder_names: Optional[List[str]] = None,
     explicit_port: Optional[str] = None,
     baud: int = DEFAULT_BAUD,
     fqbn: str = DEFAULT_FQBN,
@@ -399,31 +401,23 @@ def continuous_flashing_loop(
         base_name = base_path.name
         print(f"{Colors.YELLOW}[INFO] Created default '{base_path}'.{Colors.RESET}")
 
-    # Step 2: Load secondary dedication text (if any) inside texts/
-    dedication_name, dedication_text = load_text_file(person_file, folder=texts_dir)
-    if dedication_name:
-        print(f"{Colors.GREEN}✓ Loaded dedication from '{texts_dir}/{dedication_name}'.{Colors.RESET}")
-    else:
-        print(f"{Colors.DIM}• No dedication file loaded (using '{base_name}' only).{Colors.RESET}")
-
-    # Step 3: Recompile sketch injecting HTML and substituted tokens
+    # Step 2: Recompile sketch injecting HTML and substituted tokens
     if not compile_sketch(
         sketch_path=SKETCH_FILE,
         html_path=html_file,
         build_dir=BUILD_DIR,
         fqbn=fqbn,
         main_text=base_text,
-        dedication_text=dedication_text,
         texts_dir=texts_dir,
         base_text_file=base_text_file,
-        person_file=person_file,
+        placeholder_names=placeholder_names,
     ):
         print(f"{Colors.RED}[FATAL] Compilation failed. Cannot proceed with flashing.{Colors.RESET}")
         return
 
     # In-memory RAM history for this run only
     history = FlashHistory()
-    print_banner(baud, fqbn, html_file, texts_dir, base_text_file, dedication_name)
+    print_banner(baud, fqbn, html_file, texts_dir, base_text_file)
 
     current_port_name: Optional[str] = None
     last_notified_mac: Optional[str] = None
@@ -486,8 +480,7 @@ def continuous_flashing_loop(
                 continue
 
             # Ready to flash
-            ded_display = f" | Dedication: {dedication_name}" if dedication_name else ""
-            print(f"{Colors.BOLD}{Colors.CYAN}⚡ Flashing Board on {port_name} (MAC: {mac}, Chip: {chip_info}{ded_display})...{Colors.RESET}")
+            print(f"{Colors.BOLD}{Colors.CYAN}⚡ Flashing Board on {port_name} (MAC: {mac}, Chip: {chip_info})...{Colors.RESET}")
             success, duration, output = flash_board(port_name, baud=baud, build_dir=BUILD_DIR)
 
             if success:
@@ -496,16 +489,12 @@ def continuous_flashing_loop(
                     port=port_name,
                     chip=chip_info or "ESP32",
                     duration_s=duration,
-                    dedication=dedication_name,
                 )
                 last_notified_mac = mac
 
-                ded_label = f" ({dedication_name})" if dedication_name else ""
-                print(f"\n{Colors.BG_GREEN} ✓ FLASH SUCCESSFUL! {Colors.RESET} {Colors.GREEN}Board #{record.count}{ded_label} flashed in {duration:.1f}s!{Colors.RESET}")
+                print(f"\n{Colors.BG_GREEN} ✓ FLASH SUCCESSFUL! {Colors.RESET} {Colors.GREEN}Board #{record.count} flashed in {duration:.1f}s!{Colors.RESET}")
                 print(f"  {Colors.BOLD}MAC:{Colors.RESET}       {mac}")
                 print(f"  {Colors.BOLD}Port:{Colors.RESET}      {port_name}")
-                if dedication_name:
-                    print(f"  {Colors.BOLD}Dedication:{Colors.RESET} {dedication_name}")
                 print(f"  {Colors.BOLD}This Run:{Colors.RESET}  {len(history.records)} board(s) completed")
                 print(f"\n{Colors.BOLD}{Colors.WHITE}👉 Please UNPLUG this board and connect the next one.{Colors.RESET}\n")
 
@@ -534,8 +523,7 @@ def continuous_flashing_loop(
         if history.records:
             print(f"\n  {Colors.BOLD}Flashed boards:{Colors.RESET}")
             for r in history.records.values():
-                ded_str = f" | {r.dedication}" if r.dedication else ""
-                print(f"    • Board #{r.count:02d} | MAC: {r.mac}{ded_str} | {r.duration_s}s | {r.timestamp}")
+                print(f"    • Board #{r.count:02d} | MAC: {r.mac} | {r.duration_s}s | {r.timestamp}")
 
         print(f"{Colors.CYAN}{'═' * 66}{Colors.RESET}\n")
 
@@ -548,7 +536,7 @@ if __name__ == "__main__":
         texts_dir=cfg.texts_dir,
         html_file=cfg.html_file,
         base_text_file=cfg.base_text_file,
-        person_file=cfg.person_file,
+        placeholder_names=cfg.placeholder_names,
         explicit_port=cfg.port,
         baud=cfg.baud,
         fqbn=cfg.fqbn,

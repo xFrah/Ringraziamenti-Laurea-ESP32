@@ -19,7 +19,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from config import load_config, load_all_texts_map
 
@@ -73,11 +73,11 @@ def render_preview_html(
     html_file: str = "index.html",
     texts_dir: str = "texts",
     base_text_file: str = "text.txt",
-    person_file: Optional[str] = None,
+    placeholder_names: Optional[List[str]] = None,
     mapping_file: str = "mapping.json",
     include_live_reload: bool = False,
 ) -> str:
-    """Reads index.html and injects base text and dedication from texts/."""
+    """Reads index.html and injects base text and dedication dictionary from texts/."""
     html_path = Path(html_file)
     if not html_path.is_file():
         return f"<h1>Error: {html_file} not found</h1>"
@@ -89,11 +89,7 @@ def render_preview_html(
     if not base_text:
         base_text = "Grazie di cuore per aver condiviso questo traguardo con me! 🎓"
 
-    # Load secondary dedication from texts/
-    _, dedication_text = load_text_file(person_file, folder=texts_dir)
-
     escaped_main = html.escape(base_text.strip())
-    escaped_ded = html.escape(dedication_text.strip()) if dedication_text else ""
 
     # Build ALL_TEXTS JSON map using texts/ and mapping.json
     all_texts_map = load_all_texts_map(
@@ -103,13 +99,18 @@ def render_preview_html(
     )
     all_texts_json = json.dumps(all_texts_map, ensure_ascii=False)
 
-    rendered = raw_html.replace("[TEXT]", escaped_main)
-    rendered = rendered.replace("[ADDITIONAL_TEXT]", escaped_ded)
-    rendered = rendered.replace("[ALL_TEXTS]", all_texts_json)
+    if placeholder_names is None:
+        placeholder_names = [
+            "Mamma", "Papà", "Francesco", "Boys", "Mea",
+            "Nonna", "Teo", "Zio", "Sonia", "Martina", "Manuela"
+        ]
+    placeholder_names_json = json.dumps(placeholder_names, ensure_ascii=False)
 
-    # Inject the current person file name as the search bar placeholder
-    person_display = Path(person_file).stem if person_file else ""
-    rendered = rendered.replace("[PERSON_NAME]", html.escape(person_display))
+    rendered = raw_html.replace("[TEXT]", escaped_main)
+    rendered = rendered.replace("[ADDITIONAL_TEXT]", "")
+    rendered = rendered.replace("[ALL_TEXTS]", all_texts_json)
+    rendered = rendered.replace("[PLACEHOLDER_NAMES]", placeholder_names_json)
+    rendered = rendered.replace("[PERSON_NAME]", "Il tuo nome...")
 
     if include_live_reload:
         reload_script = """
@@ -167,20 +168,18 @@ def open_preview(
     texts_dir: str = "texts",
     html_file: str = "index.html",
     base_text_file: str = "text.txt",
-    person_file: Optional[str] = None,
+    placeholder_names: Optional[List[str]] = None,
     live_reload: bool = True,
     port: int = 8000,
 ):
-    # Determine files to watch: index.html and all .txt files in texts/
-    watched_files = [Path(html_file)]
+    # Determine files to watch: index.html, config.json, and all .txt files in texts/
+    watched_files = [Path(html_file), Path("config.json")]
     texts_path = Path(texts_dir)
     if texts_path.is_dir():
         for txt in texts_path.glob("*.txt"):
             watched_files.append(txt)
     else:
         watched_files.append(Path(base_text_file))
-        if person_file:
-            watched_files.append(Path(person_file))
 
     # Save static preview.html copy
     static_preview = Path("preview.html")
@@ -188,12 +187,10 @@ def open_preview(
         html_file=html_file,
         texts_dir=texts_dir,
         base_text_file=base_text_file,
-        person_file=person_file,
+        placeholder_names=placeholder_names,
         include_live_reload=False,
     )
     static_preview.write_text(static_html, encoding="utf-8")
-
-    dedication_name, _ = load_text_file(person_file, folder=texts_dir)
 
     if not live_reload:
         print(f"{Colors.GREEN}✓ Generated '{static_preview.name}'{Colors.RESET}")
@@ -217,7 +214,7 @@ def open_preview(
                 self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                 self.end_headers()
                 # Dynamically update watched files list in case new txt files are added
-                all_watched = [Path(html_file)]
+                all_watched = [Path(html_file), Path("config.json")]
                 if texts_path.is_dir():
                     all_watched.extend(texts_path.glob("*.txt"))
                 map_file = Path("mapping.json")
@@ -232,7 +229,7 @@ def open_preview(
                     html_file=html_file,
                     texts_dir=texts_dir,
                     base_text_file=base_text_file,
-                    person_file=person_file,
+                    placeholder_names=placeholder_names,
                     include_live_reload=True,
                 )
                 data = content.encode("utf-8")
@@ -262,7 +259,7 @@ def open_preview(
     print(f"  {Colors.BOLD}HTML File:{Colors.RESET}     {html_file}")
     print(f"  {Colors.BOLD}Texts Folder:{Colors.RESET}  {texts_dir}/")
     print(f"  {Colors.BOLD}Base Text:{Colors.RESET}     {base_text_file} -> [TEXT]")
-    print(f"  {Colors.BOLD}Dedication:{Colors.RESET}    {Colors.MAGENTA}{dedication_name or 'None'}{Colors.RESET} -> [ADDITIONAL_TEXT]")
+    print(f"  {Colors.BOLD}All Texts:{Colors.RESET}     {texts_dir}/ -> [ALL_TEXTS]")
     print(f"  {Colors.BOLD}Preview URL:{Colors.RESET}   {Colors.GREEN}{url}{Colors.RESET}")
     print(f"  {Colors.BOLD}Live Reload:{Colors.RESET}   {Colors.CYAN}Active{Colors.RESET} (editing files automatically refreshes browser)")
     print(f"{Colors.CYAN}{'─' * 66}{Colors.RESET}")
@@ -279,7 +276,7 @@ def open_preview(
     try:
         while True:
             time.sleep(0.5)
-            all_watched = [Path(html_file)]
+            all_watched = [Path(html_file), Path("config.json")]
             if texts_path.is_dir():
                 all_watched.extend(texts_path.glob("*.txt"))
             new_version = get_files_version(all_watched)
@@ -301,7 +298,7 @@ if __name__ == "__main__":
         texts_dir=cfg.texts_dir,
         html_file=cfg.html_file,
         base_text_file=cfg.base_text_file,
-        person_file=cfg.person_file,
+        placeholder_names=cfg.placeholder_names,
         live_reload=cfg.live_reload,
         port=cfg.preview_port,
     )

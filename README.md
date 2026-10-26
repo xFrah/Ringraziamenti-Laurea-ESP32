@@ -55,7 +55,19 @@ All configuration is centralized in `config.json`. If `config.json` does not exi
   "texts_dir": "texts",
   "html_file": "index.html",
   "base_text_file": "text.txt",
-  "person_file": "Mamma.txt",
+  "placeholder_names": [
+    "Mamma",
+    "Papà",
+    "Francesco",
+    "Boys",
+    "Mea",
+    "Nonna",
+    "Teo",
+    "Zio",
+    "Sonia",
+    "Martina",
+    "Manuela"
+  ],
   "port": null,
   "baud": 921600,
   "fqbn": "esp32:esp32:esp32c3",
@@ -67,9 +79,9 @@ All configuration is centralized in `config.json`. If `config.json` does not exi
 
 ### Configuration Flags:
 - **`texts_dir`**: Folder containing all your plain text files (default: `"texts"`).
-- **`html_file`**: HTML template file with `[TEXT]` and `[ADDITIONAL_TEXT]` tokens (default: `"index.html"`).
+- **`html_file`**: HTML template file (default: `"index.html"`).
 - **`base_text_file`**: Base greeting message inside `texts/` (default: `"text.txt"`).
-- **`person_file`**: Secondary dedication file inside `texts/` (e.g. `"Mamma.txt"`, `"Papà.txt"`, or `null`).
+- **`placeholder_names`**: List of sample names that cycle with typewriter animation in the search input placeholder.
 - **`port`**: Serial port (e.g. `"COM3"`) or `null` for automatic detection.
 - **`baud`**: Flashing speed in baud (default: `921600` for ~3.5s flash time).
 - **`fqbn`**: Target ESP32 architecture (default: `"esp32:esp32:esp32c3"`).
@@ -85,9 +97,9 @@ Both `main.py` and `preview.py` load their settings through `config.py`. If any 
 
 - **`texts/`**: Contains all plain text files:
   - `text.txt`: Base message injected into `[TEXT]`.
-  - Dedication files (e.g. `Mamma.txt`, `Papà.txt`): Injected into `[ADDITIONAL_TEXT]`.
-- **`index.html`**: Contains the full web page structure, styling, and the `[TEXT]` / `[ADDITIONAL_TEXT]` tokens.
-- **`main.ino`**: Contains `const char HTML_PAGE[] PROGMEM = R"=====([HTML_PAGE])=====";`. When compiling, `main.py` reads `index.html`, loads texts from `texts/`, and injects the resulting HTML into the sketch before flashing.
+  - Dedication files (e.g. `Mea.txt`, `Boys.txt`): Packaged into `[ALL_TEXTS]` and dynamically displayed when a recipient enters their name.
+- **`index.html`**: Contains the full web page structure, styling, search reveal button, and name input.
+- **`main.ino`**: Contains `const char HTML_PAGE[] PROGMEM = R"=====([HTML_PAGE])=====";`. When compiling, `main.py` reads `index.html`, bundles texts from `texts/`, and injects the resulting HTML into the sketch before flashing.
 - **`config.py`**: Configuration loader and validator.
 - **`example.config.json`**: Template configuration tracked in git.
 - **`config.json`**: Active user configuration.

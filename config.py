@@ -28,7 +28,7 @@ REQUIRED_FLAGS: List[str] = [
     "texts_dir",
     "html_file",
     "base_text_file",
-    "person_file",
+    "placeholder_names",
     "port",
     "baud",
     "fqbn",
@@ -43,7 +43,7 @@ class Config:
     texts_dir: str
     html_file: str
     base_text_file: str
-    person_file: Optional[str]
+    placeholder_names: List[str]
     port: Optional[str]
     baud: int
     fqbn: str
@@ -61,7 +61,7 @@ class Config:
             "texts_dir": self.texts_dir,
             "html_file": self.html_file,
             "base_text_file": self.base_text_file,
-            "person_file": self.person_file,
+            "placeholder_names": self.placeholder_names,
             "port": self.port,
             "baud": self.baud,
             "fqbn": self.fqbn,
@@ -107,12 +107,21 @@ def load_config(
             f"Please check '{example_path}' for the expected format."
         )
 
+    raw_names = data.get("placeholder_names")
+    if isinstance(raw_names, list):
+        names_list = [str(n) for n in raw_names]
+    else:
+        names_list = [
+            "Mamma", "Papà", "Francesco", "Boys", "Mea",
+            "Nonna", "Teo", "Zio", "Sonia", "Martina", "Manuela"
+        ]
+
     return Config(
         texts_dir=str(data["texts_dir"]),
         html_file=str(data["html_file"]),
         base_text_file=str(data["base_text_file"]),
-        person_file=str(data["person_file"]) if data["person_file"] is not None else None,
-        port=str(data["port"]) if data["port"] is not None else None,
+        placeholder_names=names_list,
+        port=str(data["port"]) if data.get("port") is not None else None,
         baud=int(data["baud"]),
         fqbn=str(data["fqbn"]),
         allow_reflash=bool(data["allow_reflash"]),
