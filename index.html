@@ -60,11 +60,59 @@
       transform: translateY(6px);
     }
 
-    /* Search bar below the card */
+    /* Reveal button below card */
+    .reveal-wrapper {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+    }
+    .reveal-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(0, 0, 0, 0.08);
+      color: #627d98;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .reveal-btn:hover {
+      background: rgba(255, 255, 255, 0.85);
+      color: #334e68;
+      transform: translateY(2px);
+    }
+    .reveal-btn:active {
+      transform: translateY(3px) scale(0.96);
+    }
+
+    /* Search bar below the card (hidden until revealed) */
     .search-wrapper {
       max-width: 520px;
       width: 100%;
       margin-top: 16px;
+      display: none;
+    }
+    .search-wrapper.visible {
+      display: block;
+      animation: fadeInSearch 0.35s ease forwards;
+    }
+    @keyframes fadeInSearch {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     .search-input {
       width: 100%;
@@ -121,7 +169,15 @@
     <div class="dedication" id="dedication">[ADDITIONAL_TEXT]</div>
   </div>
 
-  <div class="search-wrapper">
+  <div class="reveal-wrapper" id="revealWrapper">
+    <button class="reveal-btn" id="revealBtn" aria-label="Mostra barra di ricerca" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </button>
+  </div>
+
+  <div class="search-wrapper" id="searchWrapper">
     <input
       type="text"
       class="search-input"
@@ -138,11 +194,20 @@
     var ALL_TEXTS = [ALL_TEXTS];
 
     (function() {
+      var revealBtn = document.getElementById('revealBtn');
+      var revealWrapper = document.getElementById('revealWrapper');
+      var searchWrapper = document.getElementById('searchWrapper');
       var input = document.getElementById('searchInput');
       var dedication = document.getElementById('dedication');
       var defaultText = dedication.textContent;
       var debounceTimer = null;
       var currentLoaded = null;
+
+      revealBtn.addEventListener('click', function() {
+        revealWrapper.style.display = 'none';
+        searchWrapper.classList.add('visible');
+        input.focus();
+      });
 
       input.addEventListener('input', function() {
         clearTimeout(debounceTimer);

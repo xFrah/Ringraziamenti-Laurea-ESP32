@@ -26,7 +26,7 @@ void handleRoot() {
 
 void redirectToPortal() {
   server.sendHeader("Location", "http://4.3.2.1/", true);
-  server.send(302, "text/plain", "");
+  server.send(302, "text/html", "<html><body><a href=\"http://4.3.2.1/\">Redirecting...</a></body></html>");
 }
 
 void setup() {
@@ -45,14 +45,8 @@ void setup() {
   delay(100); 
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
-  // 1b. RFC 8910 DHCP Option 114 for direct captive portal URL discovery
-  static char captiveportal_uri[] = "http://4.3.2.1/";
-  esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-  if (ap_netif != NULL) {
-    esp_netif_dhcps_stop(ap_netif);
-    esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captiveportal_uri, strlen(captiveportal_uri));
-    esp_netif_dhcps_start(ap_netif);
-  }
+  // 1b. (Optional) RFC 8910 DHCP Option 114 is omitted because iOS strictly rejects http:// URIs for Option 114
+  // Standard DNS redirection + HTTP 302 handles both Android and iOS reliably
   
   // 2. Start DNS with TTL = 0 so phones don't cache it
   dnsServer.setTTL(0);
@@ -67,8 +61,10 @@ void setup() {
   server.on("/gen_204", redirectToPortal);
   
   // Apple iOS / macOS
-  server.on("/hotspot-detect.html", handleRoot);
-  server.on("/library/test/success.html", handleRoot);
+  server.on("/hotspot-detect.html", redirectToPortal);
+  server.on("/canonical.html", redirectToPortal);
+  server.on("/success.txt", redirectToPortal);
+  server.on("/library/test/success.html", redirectToPortal);
   
   // Windows
   server.on("/ncsi.txt", redirectToPortal);
