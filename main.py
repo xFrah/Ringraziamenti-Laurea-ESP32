@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import html
+import json
 import os
 import re
 import shutil
@@ -172,11 +173,14 @@ def compile_sketch(
     fqbn: str = DEFAULT_FQBN,
     main_text: str = "",
     dedication_text: Optional[str] = None,
+    texts_dir: str = "texts",
+    base_text_file: str = "text.txt",
+    person_file: Optional[str] = None,
 ) -> bool:
     """
-    Loads html_path, substitutes [TEXT] and [ADDITIONAL_TEXT] tokens, injects the
-    resulting HTML into sketch_path, stages into a temporary build folder, and
-    recompiles with arduino-cli.
+    Loads html_path, substitutes [TEXT], [ADDITIONAL_TEXT], and [ALL_TEXTS] tokens,
+    injects the resulting HTML into sketch_path, stages into a temporary build folder,
+    and recompiles with arduino-cli.
     The original sketch_path and html_path remain clean with tokens intact.
     """
     sketch = Path(sketch_path)
@@ -219,8 +223,28 @@ def compile_sketch(
     escaped_main = html.escape(main_text.strip())
     escaped_ded = html.escape(dedication_text.strip()) if dedication_text else ""
 
+    # Build ALL_TEXTS JSON map from all .txt files in texts_dir (excluding base_text_file)
+    all_texts_map = {}
+    texts_path = Path(texts_dir)
+    if texts_path.is_dir():
+        base_name = Path(base_text_file).name.lower()
+        for txt_file in texts_path.glob("*.txt"):
+            if txt_file.name.lower() == base_name:
+                continue  # skip the base text file
+            try:
+                content = txt_file.read_text(encoding="utf-8").strip()
+                all_texts_map[txt_file.stem.lower()] = content
+            except Exception:
+                pass
+    all_texts_json = json.dumps(all_texts_map, ensure_ascii=False)
+
     processed_html = html_content.replace("[TEXT]", escaped_main)
     processed_html = processed_html.replace("[ADDITIONAL_TEXT]", escaped_ded)
+    processed_html = processed_html.replace("[ALL_TEXTS]", all_texts_json)
+
+    # Inject the current person file name as the search bar placeholder
+    person_display = Path(person_file).stem if person_file else ""
+    processed_html = processed_html.replace("[PERSON_NAME]", html.escape(person_display))
 
     # Inject processed HTML into sketch
     sketch_content = sketch.read_text(encoding="utf-8")
@@ -396,6 +420,9 @@ def continuous_flashing_loop(
         fqbn=fqbn,
         main_text=base_text,
         dedication_text=dedication_text,
+        texts_dir=texts_dir,
+        base_text_file=base_text_file,
+        person_file=person_file,
     ):
         print(f"{Colors.RED}[FATAL] Compilation failed. Cannot proceed with flashing.{Colors.RESET}")
         return

@@ -11,6 +11,7 @@
       background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       padding: 20px;
@@ -49,6 +50,66 @@
     .divider:has(+ .dedication:empty) {
       display: none;
     }
+
+    /* Dedication fade transition */
+    .dedication {
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    .dedication.fade-out {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    /* Search bar below the card */
+    .search-wrapper {
+      max-width: 520px;
+      width: 100%;
+      margin-top: 16px;
+    }
+    .search-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 1rem;
+      font-family: inherit;
+      color: #334e68;
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      caret-color: #627d98;
+    }
+    .search-input:focus {
+      border-color: rgba(98, 125, 152, 0.4);
+      box-shadow: 0 0 0 3px rgba(98, 125, 152, 0.1);
+      background: rgba(255, 255, 255, 0.85);
+    }
+    .search-input::placeholder {
+      color: #b0bec5;
+      font-style: italic;
+    }
+
+    /* Shake animation for wrong guesses */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      15% { transform: translateX(-6px); }
+      30% { transform: translateX(5px); }
+      45% { transform: translateX(-4px); }
+      60% { transform: translateX(3px); }
+      75% { transform: translateX(-2px); }
+    }
+    .search-input.shake {
+      animation: shake 0.4s ease;
+      border-color: rgba(188, 75, 73, 0.5);
+    }
+
+    /* Success flash */
+    .search-input.success {
+      border-color: rgba(72, 163, 105, 0.6);
+      box-shadow: 0 0 0 3px rgba(72, 163, 105, 0.15);
+    }
   </style>
 </head>
 <body>
@@ -57,7 +118,89 @@
     <h1>Alleluia!</h1>
     <div class="main-text">[TEXT]</div>
     <div class="divider"></div>
-    <div class="dedication">[ADDITIONAL_TEXT]</div>
+    <div class="dedication" id="dedication">[ADDITIONAL_TEXT]</div>
   </div>
+
+  <div class="search-wrapper">
+    <input
+      type="text"
+      class="search-input"
+      id="searchInput"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="[PERSON_NAME]"
+    >
+  </div>
+
+  <script>
+    // All dedication texts are embedded at build time as a JSON map
+    // Keys are lowercase filenames (without .txt), values are the text content
+    var ALL_TEXTS = [ALL_TEXTS];
+
+    (function() {
+      var input = document.getElementById('searchInput');
+      var dedication = document.getElementById('dedication');
+      var defaultText = dedication.textContent;
+      var debounceTimer = null;
+      var currentLoaded = null;
+
+      input.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var query = input.value.trim();
+
+        if (!query) {
+          if (currentLoaded !== null) {
+            swapText(defaultText, true);
+            currentLoaded = null;
+          }
+          return;
+        }
+
+        debounceTimer = setTimeout(function() {
+          lookupDedication(query);
+        }, 800);
+      });
+
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          clearTimeout(debounceTimer);
+          var query = input.value.trim();
+          if (query) lookupDedication(query);
+        }
+      });
+
+      function lookupDedication(name) {
+        var key = name.toLowerCase().replace(/\.txt$/i, '');
+        var text = ALL_TEXTS[key];
+
+        if (text !== undefined) {
+          if (text === dedication.textContent) return;
+          currentLoaded = key;
+
+          input.classList.remove('shake', 'success');
+          input.classList.add('success');
+          setTimeout(function() { input.classList.remove('success'); }, 800);
+
+          swapText(text, false);
+        } else {
+          // Shake on wrong guess
+          input.classList.remove('shake');
+          input.offsetHeight;
+          input.classList.add('shake');
+          setTimeout(function() { input.classList.remove('shake'); }, 500);
+        }
+      }
+
+      function swapText(newText, isReset) {
+        dedication.classList.add('fade-out');
+        setTimeout(function() {
+          dedication.textContent = newText;
+          dedication.offsetHeight;
+          dedication.classList.remove('fade-out');
+        }, 350);
+      }
+    })();
+  </script>
 </body>
 </html>
+

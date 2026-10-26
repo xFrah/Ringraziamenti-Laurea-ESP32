@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import html
 import http.server
+import json
 import os
 import socket
 import socketserver
@@ -93,8 +94,28 @@ def render_preview_html(
     escaped_main = html.escape(base_text.strip())
     escaped_ded = html.escape(dedication_text.strip()) if dedication_text else ""
 
+    # Build ALL_TEXTS JSON map from all .txt files in texts_dir (excluding base_text_file)
+    all_texts_map = {}
+    texts_path = Path(texts_dir)
+    if texts_path.is_dir():
+        base_name = Path(base_text_file).name.lower()
+        for txt_file in texts_path.glob("*.txt"):
+            if txt_file.name.lower() == base_name:
+                continue  # skip the base text file
+            try:
+                content = txt_file.read_text(encoding="utf-8").strip()
+                all_texts_map[txt_file.stem.lower()] = content
+            except Exception:
+                pass
+    all_texts_json = json.dumps(all_texts_map, ensure_ascii=False)
+
     rendered = raw_html.replace("[TEXT]", escaped_main)
     rendered = rendered.replace("[ADDITIONAL_TEXT]", escaped_ded)
+    rendered = rendered.replace("[ALL_TEXTS]", all_texts_json)
+
+    # Inject the current person file name as the search bar placeholder
+    person_display = Path(person_file).stem if person_file else ""
+    rendered = rendered.replace("[PERSON_NAME]", html.escape(person_display))
 
     if include_live_reload:
         reload_script = """
