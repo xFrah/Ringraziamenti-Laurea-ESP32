@@ -243,22 +243,37 @@ def compile_sketch(
     processed_html = processed_html.replace("[PLACEHOLDER_NAMES]", placeholder_names_json)
     processed_html = processed_html.replace("[PERSON_NAME]", "Il tuo nome...")
 
-    # Inject processed HTML into sketch
+    # Stage processed HTML into html_page.h inside the temporary directory.
+    # Storing the HTML in a separate .h header file is critical: arduino-cli's preprocessor
+    # scans .ino files for C function definitions and attempts to insert prototypes/line directives,
+    # which corrupts JavaScript inside raw string literals. Header files are compiled directly by g++.
+    temp_stage = Path(tempfile.gettempdir()) / "esp32_build_main" / "main"
+    temp_stage.mkdir(parents=True, exist_ok=True)
+
+    header_content = (
+        '#pragma once\n'
+        '#include <Arduino.h>\n\n'
+        'const char HTML_PAGE[] PROGMEM = R"=====(\n'
+        f'{processed_html}\n'
+        ')=====";\n'
+    )
+    (temp_stage / "html_page.h").write_text(header_content, encoding="utf-8")
+
+    # In main.ino, replace the HTML_PAGE definition with #include "html_page.h"
     sketch_content = sketch.read_text(encoding="utf-8")
-    if "[HTML_PAGE]" in sketch_content:
-        processed_sketch = sketch_content.replace("[HTML_PAGE]", processed_html)
-    else:
-        # Fallback if sketch still has raw HTML block
+    target_declaration = 'const char HTML_PAGE[] PROGMEM = R"=====([HTML_PAGE])=====";'
+    if target_declaration in sketch_content:
+        processed_sketch = sketch_content.replace(target_declaration, '#include "html_page.h"')
+    elif 'const char HTML_PAGE[]' in sketch_content:
         processed_sketch = re.sub(
-            r'(const char HTML_PAGE\[\] PROGMEM = R"=====\()(.*?)(\)=====";)',
-            lambda m: f"{m.group(1)}\n{processed_html}\n{m.group(3)}",
+            r'const char HTML_PAGE\[\]\s*PROGMEM\s*=\s*R"=====\(.*?\)\s*=====";',
+            '#include "html_page.h"',
             sketch_content,
             flags=re.DOTALL,
         )
+    else:
+        processed_sketch = sketch_content
 
-    # Stage processed sketch into temporary directory named 'main/main.ino'
-    temp_stage = Path(tempfile.gettempdir()) / "esp32_build_main" / "main"
-    temp_stage.mkdir(parents=True, exist_ok=True)
     (temp_stage / "main.ino").write_text(processed_sketch, encoding="utf-8")
 
     print(f"{Colors.CYAN}[BUILD] Compiling '{sketch_path}' (with '{html_path}') for '{fqbn}'...{Colors.RESET}")

@@ -83,6 +83,12 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
       outline: none;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .reveal-btn svg {
+      pointer-events: none;
     }
     .reveal-btn:hover {
       background: rgba(255, 255, 255, 0.85);
@@ -194,7 +200,7 @@
     var ALL_TEXTS = [ALL_TEXTS];
     var PLACEHOLDER_NAMES = [PLACEHOLDER_NAMES];
 
-    (function() {
+    function init() {
       var revealBtn = document.getElementById('revealBtn');
       var revealWrapper = document.getElementById('revealWrapper');
       var searchWrapper = document.getElementById('searchWrapper');
@@ -306,7 +312,8 @@
           dedication.classList.remove('fade-out');
         }, 350);
       }
-    })();
+    }
+    init();
   </script>
 </body>
 </html>
