@@ -44,10 +44,13 @@
     .divider {
       height: 1px;
       background: #e2e8f0;
-      margin: 12px 0;
+      margin: 14px 0;
+      display: none;
     }
-    .dedication:empty,
-    .divider:has(+ .dedication:empty) {
+    .divider.visible {
+      display: block;
+    }
+    .dedication:empty {
       display: none;
     }
 
@@ -171,7 +174,7 @@
     <div class="icon">🎓</div>
     <h1>Alleluia!</h1>
     <div class="main-text">[TEXT]</div>
-    <div class="divider"></div>
+    <div class="divider" id="divider"></div>
     <div class="dedication" id="dedication"></div>
   </div>
 
@@ -206,8 +209,13 @@
       var searchWrapper = document.getElementById('searchWrapper');
       var input = document.getElementById('searchInput');
       var dedication = document.getElementById('dedication');
+      var divider = document.getElementById('divider');
       var debounceTimer = null;
       var currentLoaded = null;
+
+      if (dedication.textContent && dedication.textContent.trim()) {
+        divider.classList.add('visible');
+      }
 
       // Typewriter placeholder animation
       var nameIndex = 0;
@@ -308,6 +316,11 @@
         dedication.classList.add('fade-out');
         setTimeout(function() {
           dedication.textContent = newText;
+          if (newText && newText.trim()) {
+            divider.classList.add('visible');
+          } else {
+            divider.classList.remove('visible');
+          }
           dedication.offsetHeight;
           dedication.classList.remove('fade-out');
         }, 350);
