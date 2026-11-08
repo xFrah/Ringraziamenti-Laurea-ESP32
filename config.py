@@ -187,8 +187,10 @@ def load_all_texts_map(
                         target_key = raw_val.strip().lower()
                         target_stem = target_key[:-4] if target_key.endswith(".txt") else target_key
 
-                        content = file_contents.get(target_stem) or file_contents.get(target_key)
-                        if not content:
+                        content = file_contents.get(target_stem)
+                        if content is None:
+                            content = file_contents.get(target_key)
+                        if content is None:
                             print(f"[WARN] {mapping_file}: Target file '{raw_val}' not found in '{texts_dir}'.")
                             continue
 
@@ -214,8 +216,10 @@ def load_all_texts_map(
                         target_key = raw_key.strip().lower()
                         target_stem = target_key[:-4] if target_key.endswith(".txt") else target_key
 
-                        content = file_contents.get(target_stem) or file_contents.get(target_key)
-                        if not content:
+                        content = file_contents.get(target_stem)
+                        if content is None:
+                            content = file_contents.get(target_key)
+                        if content is None:
                             continue
 
                         for alias in raw_val:
